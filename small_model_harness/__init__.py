@@ -820,3 +820,55 @@ from .tool_disclosure import (
     get_tool_subset,
     build_compact_tool_prompt,
 )
+
+
+# ---------------------------------------------------------------------------
+# Thinking model detection
+# ---------------------------------------------------------------------------
+
+import re as _re
+
+NON_THINKING_MODEL_MARKERS: tuple[str, ...] = (
+    "chatterbox", "piper", "whisper", "bark", "tts-", "stt-",
+)
+
+
+def is_thinking_model(model_id: str) -> bool:
+    """Detect whether a model is a thinking model based on its ID.
+
+    Thinking models emit ``<think>`` blocks that would be suppressed by
+    a grammar constraint.  Returns True unless the model ID matches a known
+    non-thinking model marker.
+    """
+    lower = model_id.lower()
+    return not any(marker in lower for marker in NON_THINKING_MODEL_MARKERS)
+
+
+def split_thinking(text: str) -> tuple[str, str]:
+    """Split a model response into ``(thinking, visible)`` parts.
+
+    Extracts ``<think>...</think>`` blocks as silent reasoning. If no
+    thinking block is present the whole text is returned as visible with an
+    empty thinking part.
+    """
+    think_pattern = _re.compile(r"<think>(.*?)</think>", _re.DOTALL)
+    thinking_parts: list[str] = []
+    last_end = 0
+    visible_parts: list[str] = []
+
+    for match in think_pattern.finditer(text):
+        before = text[last_end : match.start()]
+        if before:
+            visible_parts.append(before)
+        thinking_parts.append(match.group(1).strip())
+        last_end = match.end()
+
+    tail = text[last_end:]
+    if tail:
+        visible_parts.append(tail)
+
+    thinking = "\n\n".join(p for p in thinking_parts if p)
+    visible = "".join(visible_parts).strip()
+    if not thinking:
+        visible = text.strip()
+    return thinking, visible
