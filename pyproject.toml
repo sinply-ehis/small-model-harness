@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "small-model-harness"
-version = "0.1.0"
+version = "0.2.0"
 description = "Session-level intelligence for small LLMs — failure tracking, adaptive steering, loop detection, response compaction."
 readme = "README.md"
 license = "MIT"
