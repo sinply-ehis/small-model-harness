@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f3460"/>
+      <stop offset="100%" style="stop-color:#533483"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e94560"/>
+      <stop offset="100%" style="stop-color:#ff6b6b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background hexagon -->
+  <polygon points="60,5 110,30 110,90 60,115 10,90 10,30" fill="url(#bg)" stroke="url(#accent)" stroke-width="2"/>
+
+  <!-- Inner hexagon border -->
+  <polygon points="60,15 100,35 100,85 60,105 20,85 20,35" fill="none" stroke="#533483" stroke-width="1" opacity="0.5"/>
+
+  <!-- Neural network nodes -->
+  <!-- Input layer -->
+  <circle cx="32" cy="45" r="4" fill="#e94560" opacity="0.9"/>
+  <circle cx="32" cy="60" r="4" fill="#e94560" opacity="0.9"/>
+  <circle cx="32" cy="75" r="4" fill="#e94560" opacity="0.9"/>
+
+  <!-- Hidden layer -->
+  <circle cx="55" cy="40" r="5" fill="#ff6b6b" opacity="0.9"/>
+  <circle cx="55" cy="55" r="5" fill="#ff6b6b" opacity="0.9"/>
+  <circle cx="55" cy="70" r="5" fill="#ff6b6b" opacity="0.9"/>
+  <circle cx="55" cy="85" r="5" fill="#ff6b6b" opacity="0.9"/>
+
+  <!-- Output layer -->
+  <circle cx="78" cy="48" r="4" fill="#e94560" opacity="0.9"/>
+  <circle cx="78" cy="63" r="4" fill="#e94560" opacity="0.9"/>
+  <circle cx="78" cy="78" r="4" fill="#e94560" opacity="0.9"/>
+
+  <!-- Connections (faded) -->
+  <line x1="32" y1="45" x2="55" y2="40" stroke="#533483" stroke-width="0.8" opacity="0.4"/>
+  <line x1="32" y1="45" x2="55" y2="55" stroke="#533483" stroke-width="0.8" opacity="0.4"/>
+  <line x1="32" y1="60" x2="55" y2="55" stroke="#533483" stroke-width="0.8" opacity="0.4"/>
+  <line x1="32" y1="60" x2="55" y2="70" stroke="#533483" stroke-width="0.8" opacity="0.4"/>
+  <line x1="32" y1="75" x2="55" y2="70" stroke="#533483" stroke-width="0.8" opacity="0.4"/>
+  <line x1="32" y1="75" x2="55" y2="85" stroke="#533483" stroke-width="0.8" opacity="0.4"/>
+
+  <line x1="55" y1="40" x2="78" y2="48" stroke="#533483" stroke-width="0.8" opacity="0.4"/>
+  <line x1="55" y1="55" x2="78" y2="63" stroke="#533483" stroke-width="0.8" opacity="0.4"/>
+  <line x1="55" y1="70" x2="78" y2="78" stroke="#533483" stroke-width="0.8" opacity="0.4"/>
+  <line x1="55" y1="85" x2="78" y2="78" stroke="#533483" stroke-width="0.8" opacity="0.4"/>
+
+  <!-- Harness bracket (left) -->
+  <path d="M 25,32 Q 15,60 25,88" fill="none" stroke="#e94560" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Harness bracket (right) -->
+  <path d="M 85,32 Q 95,60 85,88" fill="none" stroke="#e94560" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Lock icon (center bottom) -->
+  <rect x="53" y="90" width="14" height="10" rx="2" fill="#e94560"/>
+  <path d="M 56,90 L 56,86 Q 56,82 60,82 Q 64,82 64,86 L 64,90" fill="none" stroke="#e94560" stroke-width="1.5"/>
+
+  <!-- Small "h" lettermark -->
+  <text x="95" y="100" font-family="monospace" font-size="14" font-weight="bold" fill="#e94560" opacity="0.7">h</text>
+</svg>
