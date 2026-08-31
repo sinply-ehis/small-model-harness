@@ -139,6 +139,73 @@ This is a **session intelligence layer**, not an agent framework. It sits betwee
 - **Composable**: Use `HarnessState` in your existing streaming loop
 - **Observable**: Full audit trail for debugging small model behavior
 
+---
+
+## Pydantic-deep integration (optional)
+
+For full agent capabilities (context compaction, subagents, skills, memory, planning), install with the `pydantic-deep` extra:
+
+```bash
+pip install "small-model-harness[pydantic-deep]"
+```
+
+This adds pydantic-deep's agent framework, configured for small models:
+
+| Feature | How it's configured for small models |
+|---|---|
+| **Context compaction** | Sliding window (free, no LLM call) instead of LLM summarization |
+| **Subagents** | Delegate to specialist models for complex subtasks |
+| **Skills** | Load domain knowledge from SKILL.md files on demand |
+| **Memory** | Persistent MEMORY.md across sessions |
+| **Planning** | Optional TODO lists with subtasks (off by default — token-heavy) |
+| **MCP** | Connect to external tool servers |
+| **Web search** | DuckDuckGo fallback, no API key needed |
+
+### Quick start with pydantic-deep
+
+```python
+from small_model_harness.pydantic_deep_integration import (
+    build_small_model_agent,
+    run_with_harness,
+)
+
+# Build agent + harness in one call
+result = build_small_model_agent(
+    model_url="http://localhost:8080/v1",
+    model_name="qwen3.5-4b",
+    n_ctx=4096,
+    include_subagents=True,
+    include_skills=True,
+)
+
+# Run with harness tracking
+run_result = await run_with_harness(result, "Plan a 3-step audio mixing task")
+
+# Harness state is updated automatically
+print(result.harness.get_steering_prompt())
+print(result.harness.context_pressure)
+```
+
+### What each layer does
+
+```
+┌─────────────────────────────────────────────────────┐
+│  pydantic-deep (optional)                           │
+│  Context compaction, subagents, skills, memory,     │
+│  planning, checkpoints, MCP, web search             │
+├─────────────────────────────────────────────────────┤
+│  small-model-harness (always)                       │
+│  Per-session tool stats, adaptive steering,         │
+│  response compaction, context pressure,             │
+│  budget tracking, audit trail                       │
+├─────────────────────────────────────────────────────┤
+│  llama.cpp / OpenAI-compatible endpoint             │
+└─────────────────────────────────────────────────────┘
+```
+
+- **Without pydantic-deep**: Zero-dep session intelligence. Use in any streaming loop.
+- **With pydantic-deep**: Full agent framework + our session intelligence. Best for new apps.
+
 ## License
 
 MIT

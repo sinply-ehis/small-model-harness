@@ -23,9 +23,10 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
+pydantic-deep = ["pydantic-deep>=0.3", "pydantic-ai[duckduckgo]>=0.0.50"]
 pdf = ["pymupdf>=1.23"]
 epub = ["ebooklib>=0.18", "beautifulsoup4>=4.12"]
-all = ["pymupdf>=1.23", "ebooklib>=0.18", "beautifulsoup4>=4.12"]
+full = ["pymupdf>=1.23", "ebooklib>=0.18", "beautifulsoup4>=4.12"]
 dev = ["pytest>=7.0", "pytest-cov>=4.0"]
 
 [tool.setuptools.packages.find]
