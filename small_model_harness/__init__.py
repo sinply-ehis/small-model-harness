@@ -785,3 +785,38 @@ def pydantic_tool_schema(model: type[BaseModel], name: str, description: str) ->
             "parameters": schema,
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Tool repair (deterministic, no LLM call)
+# ---------------------------------------------------------------------------
+
+from .tool_repair import (
+    repair_json,
+    coerce_types,
+    rename_keys,
+    inject_defaults,
+    repair_tool_call,
+)
+
+# ---------------------------------------------------------------------------
+# Confidence scoring
+# ---------------------------------------------------------------------------
+
+from .confidence import (
+    ConfidenceScore,
+    score_tool_call as score_tool_call_confidence,
+    should_escalate_to_cloud,
+    format_confidence_summary,
+)
+
+# ---------------------------------------------------------------------------
+# Progressive tool disclosure
+# ---------------------------------------------------------------------------
+
+from .tool_disclosure import (
+    ToolScore,
+    rank_tools,
+    get_tool_subset,
+    build_compact_tool_prompt,
+)
