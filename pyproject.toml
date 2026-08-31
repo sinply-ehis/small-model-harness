@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "small-model-harness"
+version = "0.1.0"
+description = "Session-level intelligence for small LLMs — failure tracking, adaptive steering, loop detection, response compaction."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "sinply-ehis" }]
+keywords = ["llm", "harness", "small-model", "tool-calling", "agent"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.optional-dependencies]
+pdf = ["pymupdf>=1.23"]
+epub = ["ebooklib>=0.18", "beautifulsoup4>=4.12"]
+all = ["pymupdf>=1.23", "ebooklib>=0.18", "beautifulsoup4>=4.12"]
+dev = ["pytest>=7.0", "pytest-cov>=4.0"]
+
+[tool.setuptools.packages.find]
+include = ["small_model_harness*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
