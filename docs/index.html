@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>small-model-harness — Session intelligence for 2B–4B LLMs</title>
+  <meta name="description" content="Deterministic JSON repair, confidence scoring, progressive tool disclosure, and session intelligence for small on-device language models.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['Geist Mono', 'ui-monospace', 'monospace'],
+          },
+          colors: {
+            surface: { DEFAULT: '#0a0a0a', raised: '#111111', border: '#1a1a1a' },
+            accent: { DEFAULT: '#10b981', dim: '#059669', glow: 'rgba(16,185,129,0.12)' },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body { background: #0a0a0a; color: #e5e5e5; }
+    .font-mono { font-family: 'Geist Mono', ui-monospace, monospace; }
+    .gradient-text {
+      background: linear-gradient(135deg, #10b981 0%, #34d399 50%, #6ee7b7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .code-block {
+      background: #111111;
+      border: 1px solid #1a1a1a;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+    .code-block pre { margin: 0; padding: 1.25rem; font-size: 0.8125rem; line-height: 1.7; }
+    .metric-card {
+      background: #111111;
+      border: 1px solid #1a1a1a;
+      border-radius: 12px;
+      padding: 1.5rem;
+      transition: border-color 0.2s;
+    }
+    .metric-card:hover { border-color: #10b98133; }
+    .bar { height: 6px; border-radius: 3px; background: #1a1a1a; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 3px; background: #10b981; }
+    @keyframes fade-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { animation: fade-up 0.6s ease-out both; }
+    .fade-up-d1 { animation-delay: 0.1s; }
+    .fade-up-d2 { animation-delay: 0.2s; }
+    .fade-up-d3 { animation-delay: 0.3s; }
+    @media (prefers-reduced-motion: reduce) { .fade-up { animation: none; } }
+  </style>
+</head>
+<body class="font-sans antialiased">
+
+  <!-- Nav -->
+  <nav class="fixed top-0 left-0 right-0 z-50 border-b border-surface-border bg-surface/80 backdrop-blur-xl">
+    <div class="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
+      <div class="flex items-center gap-2">
+        <span class="font-mono text-sm font-medium text-white">small-model-harness</span>
+        <span class="rounded-full bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent">v0.2.0</span>
+      </div>
+      <div class="flex items-center gap-6">
+        <a href="#features" class="text-sm text-neutral-400 hover:text-white transition-colors">Features</a>
+        <a href="#benchmark" class="text-sm text-neutral-400 hover:text-white transition-colors">Benchmark</a>
+        <a href="#install" class="text-sm text-neutral-400 hover:text-white transition-colors">Install</a>
+        <a href="https://github.com/sinply-ehis/small-model-harness" class="text-sm text-neutral-400 hover:text-white transition-colors">GitHub</a>
+        <a href="https://pypi.org/project/small-model-harness/" class="rounded-lg bg-accent/10 px-3 py-1.5 text-sm font-medium text-accent hover:bg-accent/20 transition-colors">PyPI</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="relative flex min-h-[100dvh] items-center overflow-hidden">
+    <div class="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(16,185,129,0.08),transparent)]"></div>
+    <div class="relative mx-auto w-full max-w-6xl px-6 pt-24 pb-16">
+      <div class="max-w-3xl">
+        <div class="fade-up mb-4 font-mono text-xs uppercase tracking-widest text-accent/80">Python package</div>
+        <h1 class="fade-up fade-up-d1 text-4xl font-semibold leading-[1.1] tracking-tight text-white md:text-6xl">
+          Session intelligence<br>for small LLMs
+        </h1>
+        <p class="fade-up fade-up-d2 mt-6 max-w-xl text-lg leading-relaxed text-neutral-400">
+          Deterministic JSON repair, confidence scoring, progressive tool disclosure, and session memory — built for 2B–4B on-device models that hallucinate tool calls.
+        </p>
+        <div class="fade-up fade-up-d3 mt-8 flex flex-wrap gap-3">
+          <a href="#install" class="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-black hover:bg-accent-dim transition-colors">
+            <span>pip install small-model-harness</span>
+          </a>
+          <a href="#features" class="inline-flex items-center gap-2 rounded-lg border border-surface-border bg-surface-raised px-5 py-2.5 text-sm font-medium text-neutral-300 hover:border-neutral-700 transition-colors">
+            Explore features
+          </a>
+        </div>
+        <div class="fade-up fade-up-d3 mt-10 flex flex-wrap gap-6 font-mono text-xs text-neutral-500">
+          <span>164 tests passing</span>
+          <span class="text-neutral-700">·</span>
+          <span>25/25 benchmark cases</span>
+          <span class="text-neutral-700">·</span>
+          <span>pydantic v2</span>
+          <span class="text-neutral-700">·</span>
+          <span>zero dependencies beyond pydantic</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Problem -->
+  <section class="border-t border-surface-border py-24">
+    <div class="mx-auto max-w-6xl px-6">
+      <div class="grid gap-16 md:grid-cols-2">
+        <div>
+          <h2 class="text-2xl font-semibold tracking-tight text-white">Small models make big messes</h2>
+          <p class="mt-4 leading-relaxed text-neutral-400">
+            2B–4B parameter models are fast and cheap, but they output broken JSON, hallucinate tool names, repeat the same failed call, and eat your context window. This harness fixes all of it — deterministically, without re-prompting.
+          </p>
+        </div>
+        <div class="code-block">
+          <pre><code><span class="text-neutral-500"># What the model actually outputs:</span>
+<span class="text-neutral-300">{'tool': 'speak', 'args': {'text': 'hello', 'speed': '1.5'}}</span>
+
+<span class="text-neutral-500"># What the harness produces:</span>
+<span class="text-accent">{"tool": "21labs.speak", "arguments":
+  {"text": "hello", "engine": "kokoro", "speed": 1.5}}</span></code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="border-t border-surface-border py-24">
+    <div class="mx-auto max-w-6xl px-6">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">What it does</h2>
+      <p class="mt-3 max-w-xl text-neutral-400">Five modules, one import, zero config.</p>
+
+      <div class="mt-16 grid gap-4 md:grid-cols-2">
+        <!-- Feature 1: Repair -->
+        <div class="metric-card">
+          <div class="mb-3 flex items-center gap-2">
+            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 font-mono text-sm text-accent">R</div>
+            <h3 class="font-medium text-white">Deterministic Repair</h3>
+          </div>
+          <p class="text-sm leading-relaxed text-neutral-400">
+            Fixes malformed JSON without re-prompting. Trailing commas, single quotes, unquoted keys, markdown fences, type drift, camelCase/snake_case mismatch. Pipeline: rename → coerce → inject defaults.
+          </p>
+          <div class="mt-4 font-mono text-xs text-neutral-600">repair_tool_call()</div>
+        </div>
+
+        <!-- Feature 2: Confidence -->
+        <div class="metric-card">
+          <div class="mb-3 flex items-center gap-2">
+            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 font-mono text-sm text-accent">C</div>
+            <h3 class="font-medium text-white">Confidence Scoring</h3>
+          </div>
+          <p class="text-sm leading-relaxed text-neutral-400">
+            Multi-signal scoring: schema match (35%), history (25%), completeness (25%), repair cost (15%). Decides whether to trust the local model or escalate to cloud.
+          </p>
+          <div class="mt-4 font-mono text-xs text-neutral-600">score_tool_call()</div>
+        </div>
+
+        <!-- Feature 3: Disclosure -->
+        <div class="metric-card">
+          <div class="mb-3 flex items-center gap-2">
+            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 font-mono text-sm text-accent">D</div>
+            <h3 class="font-medium text-white">Progressive Disclosure</h3>
+          </div>
+          <p class="text-sm leading-relaxed text-neutral-400">
+            Small models fail on tool selection with too many options. Ranks tools by query relevance, shows only the top N. Keyword overlap, historical success, category matching.
+          </p>
+          <div class="mt-4 font-mono text-xs text-neutral-600">rank_tools() · build_compact_tool_prompt()</div>
+        </div>
+
+        <!-- Feature 4: Session -->
+        <div class="metric-card">
+          <div class="mb-3 flex items-center gap-2">
+            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 font-mono text-sm text-accent">S</div>
+            <h3 class="font-medium text-white">Session Intelligence</h3>
+          </div>
+          <p class="text-sm leading-relaxed text-neutral-400">
+            Tracks success/failure per tool, detects same-tool loops, injects steering hints into the system prompt, monitors context pressure, compacts responses to save tokens.
+          </p>
+          <div class="mt-4 font-mono text-xs text-neutral-600">HarnessState · create_harness_session()</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Benchmark -->
+  <section id="benchmark" class="border-t border-surface-border py-24">
+    <div class="mx-auto max-w-6xl px-6">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">Benchmark results</h2>
+      <p class="mt-3 max-w-xl text-neutral-400">25 test cases across 4 categories. 100% pass rate. 9.4ms total.</p>
+
+      <div class="mt-12 grid gap-4 md:grid-cols-4">
+        <div class="metric-card text-center">
+          <div class="font-mono text-3xl font-semibold text-accent">10/10</div>
+          <div class="mt-1 text-sm text-neutral-400">JSON Repair</div>
+          <div class="mt-3 bar"><div class="bar-fill" style="width:100%"></div></div>
+        </div>
+        <div class="metric-card text-center">
+          <div class="font-mono text-3xl font-semibold text-accent">5/5</div>
+          <div class="mt-1 text-sm text-neutral-400">Confidence</div>
+          <div class="mt-3 bar"><div class="bar-fill" style="width:100%"></div></div>
+        </div>
+        <div class="metric-card text-center">
+          <div class="font-mono text-3xl font-semibold text-accent">5/5</div>
+          <div class="mt-1 text-sm text-neutral-400">Disclosure</div>
+          <div class="mt-3 bar"><div class="bar-fill" style="width:100%"></div></div>
+        </div>
+        <div class="metric-card text-center">
+          <div class="font-mono text-3xl font-semibold text-accent">5/5</div>
+          <div class="mt-1 text-sm text-neutral-400">Session</div>
+          <div class="mt-3 bar"><div class="bar-fill" style="width:100%"></div></div>
+        </div>
+      </div>
+
+      <div class="mt-10 code-block">
+        <pre><code><span class="text-neutral-500">$ python benchmarks/benchmark.py</span>
+
+<span class="text-neutral-300">--- Benchmark 1: JSON Repair ---</span>
+  <span class="text-accent">[PASS]</span> trailing comma          <span class="text-neutral-600">0.4ms</span>
+  <span class="text-accent">[PASS]</span> single quotes           <span class="text-neutral-600">0.1ms</span>
+  <span class="text-accent">[PASS]</span> missing quotes on keys  <span class="text-neutral-600">0.4ms</span>
+  <span class="text-accent">[PASS]</span> markdown fences         <span class="text-neutral-600">0.1ms</span>
+  <span class="text-accent">[PASS]</span> leading garbage         <span class="text-neutral-600">0.1ms</span>
+  <span class="text-accent">[PASS]</span> string number arg       <span class="text-neutral-600">0.1ms</span>
+  <span class="text-accent">[PASS]</span> boolean as string       <span class="text-neutral-600">0.1ms</span>
+  <span class="text-accent">[PASS]</span> camelCase keys          <span class="text-neutral-600">0.3ms</span>
+  <span class="text-accent">[PASS]</span> comments in JSON        <span class="text-neutral-600">0.1ms</span>
+  <span class="text-accent">[PASS]</span> empty arguments         <span class="text-neutral-600">0.1ms</span>
+
+<span class="text-neutral-300">--- Benchmark 2: Confidence Scoring ---</span>
+  <span class="text-accent">[PASS]</span> clean call              <span class="text-neutral-600">0.0ms</span>
+  <span class="text-accent">[PASS]</span> missing required        <span class="text-neutral-600">0.0ms</span>
+  <span class="text-accent">[PASS]</span> unknown tool            <span class="text-neutral-600">0.0ms</span>
+  <span class="text-accent">[PASS]</span> heavy repairs           <span class="text-neutral-600">0.0ms</span>
+  <span class="text-accent">[PASS]</span> avoided tool            <span class="text-neutral-600">0.0ms</span>
+
+<span class="text-accent">BENCHMARK RESULTS: 25/25 passed (100%)</span>
+<span class="text-neutral-600">Total time: 9.4ms</span></code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Code Example -->
+  <section class="border-t border-surface-border py-24">
+    <div class="mx-auto max-w-6xl px-6">
+      <div class="grid gap-16 md:grid-cols-2">
+        <div>
+          <h2 class="text-2xl font-semibold tracking-tight text-white">Quick start</h2>
+          <p class="mt-4 leading-relaxed text-neutral-400">
+            Three lines to repair, score, and rank. The harness handles the rest.
+          </p>
+          <div class="mt-8 space-y-4 text-sm text-neutral-400">
+            <div class="flex items-start gap-3">
+              <span class="mt-0.5 font-mono text-xs text-accent">01</span>
+              <span>Create a session with context-aware budgeting</span>
+            </div>
+            <div class="flex items-start gap-3">
+              <span class="mt-0.5 font-mono text-xs text-accent">02</span>
+              <span>Repair malformed JSON from the model output</span>
+            </div>
+            <div class="flex items-start gap-3">
+              <span class="mt-0.5 font-mono text-xs text-accent">03</span>
+              <span>Score confidence and decide: trust or escalate</span>
+            </div>
+            <div class="flex items-start gap-3">
+              <span class="mt-0.5 font-mono text-xs text-accent">04</span>
+              <span>Track session state, detect loops, inject hints</span>
+            </div>
+          </div>
+        </div>
+        <div class="code-block">
+          <pre><code><span class="text-keyword">from</span> small_model_harness <span class="text-keyword">import</span> (
+    create_harness_session,
+    compact_tool_response,
+)
+<span class="text-keyword">from</span> small_model_harness.tool_repair <span class="text-keyword">import</span> repair_tool_call
+<span class="text-keyword">from</span> small_model_harness.confidence <span class="text-keyword">import</span> score_tool_call
+<span class="text-keyword">from</span> small_model_harness.tool_disclosure <span class="text-keyword">import</span> rank_tools
+
+<span class="text-neutral-500"># 1. Session with auto-budget from context window</span>
+harness = create_harness_session(n_ctx=<span class="text-accent">4096</span>)
+
+<span class="text-neutral-500"># 2. Repair malformed model output</span>
+raw = <span class="text-string">\'{"tool": "speak", "args": {"text": "hi"}}\'</span>
+args, tool, fixes = repair_tool_call(raw, schemas)
+
+<span class="text-neutral-500"># 3. Score confidence</span>
+score = score_tool_call(tool, args, schema, harness)
+<span class="text-keyword">if</span> score.should_escalate:
+    escalate_to_cloud()
+
+<span class="text-neutral-500"># 4. Rank tools for next turn</span>
+top = rank_tools(<span class="text-string">"generate speech"</span>, schemas, harness)</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section id="install" class="border-t border-surface-border py-24">
+    <div class="mx-auto max-w-6xl px-6 text-center">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">Install</h2>
+      <p class="mt-3 text-neutral-400">One dependency. Works everywhere Python runs.</p>
+
+      <div class="mt-10 mx-auto max-w-lg">
+        <div class="code-block text-left">
+          <pre><code><span class="text-neutral-500">$</span> pip install small-model-harness</code></pre>
+        </div>
+      </div>
+
+      <div class="mt-8 flex flex-wrap justify-center gap-4 text-sm">
+        <a href="https://pypi.org/project/small-model-harness/" class="inline-flex items-center gap-2 rounded-lg border border-surface-border bg-surface-raised px-4 py-2 text-neutral-300 hover:border-neutral-700 transition-colors">
+          PyPI
+        </a>
+        <a href="https://github.com/sinply-ehis/small-model-harness" class="inline-flex items-center gap-2 rounded-lg border border-surface-border bg-surface-raised px-4 py-2 text-neutral-300 hover:border-neutral-700 transition-colors">
+          GitHub
+        </a>
+        <a href="https://github.com/sinply-ehis/small-model-harness/blob/main/examples/basic_usage.py" class="inline-flex items-center gap-2 rounded-lg border border-surface-border bg-surface-raised px-4 py-2 text-neutral-300 hover:border-neutral-700 transition-colors">
+          Full example
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-surface-border py-12">
+    <div class="mx-auto flex max-w-6xl items-center justify-between px-6">
+      <span class="font-mono text-xs text-neutral-600">small-model-harness v0.2.0 · MIT License</span>
+      <span class="font-mono text-xs text-neutral-600">built for 2B–4B models</span>
+    </div>
+  </footer>
+
+</body>
+</html>
