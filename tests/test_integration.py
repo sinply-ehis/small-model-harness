@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from small_model_harness import create_harness_session, HarnessState
+from small_model_harness import create_harness_session, HarnessState, ExecutionRecord
 
 
 class TestIntegrationImports:
@@ -53,15 +53,13 @@ class TestHarnessStateCompatibility:
         harness = create_harness_session(n_ctx=4096)
 
         # Simulate tool failures
-        from small_model_harness import ExecutionRecord, ExecutionStatus
-
         for _ in range(2):
             harness.record_execution(
                 ExecutionRecord(
                     timestamp="2026-01-01T00:00:00Z",
                     tool_name="bad_tool",
                     arguments={},
-                    status=ExecutionStatus.FAILED,
+                    status="failed",
                 )
             )
 
@@ -80,15 +78,13 @@ class TestHarnessStateCompatibility:
         assert harness.budget_remaining == 8
 
         # Simulate agent loop
-        from small_model_harness import ExecutionRecord, ExecutionStatus
-
         for i in range(8):
             harness.record_execution(
                 ExecutionRecord(
                     timestamp="2026-01-01T00:00:00Z",
                     tool_name=f"tool_{i}",
                     arguments={},
-                    status=ExecutionStatus.COMPLETED,
+                    status="completed",
                 )
             )
 

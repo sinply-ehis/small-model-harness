@@ -23,10 +23,13 @@ from small_model_harness import (
     generate_session_summary,
     process_file_input,
     process_multiple_files,
+    pydantic_tool_schema,
     read_text_file,
+    tool_schema,
     validate_file_input,
     validate_result_quality,
 )
+from pydantic import BaseModel, Field
 
 
 # ---------------------------------------------------------------------------
@@ -77,31 +80,31 @@ class TestToolStats:
 
     def test_success_counts(self):
         s = create_harness_session()
-        self._record(s, "search", ExecutionStatus.COMPLETED)
-        self._record(s, "search", ExecutionStatus.COMPLETED)
+        self._record(s, "search", "completed")
+        self._record(s, "search", "completed")
         assert s.tool_success_counts["search"] == 2
         assert s.successful_calls == 2
         assert s.success_rate == 1.0
 
     def test_failure_counts(self):
         s = create_harness_session()
-        self._record(s, "search", ExecutionStatus.FAILED)
-        self._record(s, "search", ExecutionStatus.FAILED)
+        self._record(s, "search", "failed")
+        self._record(s, "search", "failed")
         assert s.tool_failure_counts["search"] == 2
         assert s.failed_calls == 2
         assert s.success_rate == 0.0
 
     def test_steering_hints_after_failures(self):
         s = create_harness_session()
-        self._record(s, "bad_tool", ExecutionStatus.FAILED)
-        self._record(s, "bad_tool", ExecutionStatus.FAILED)
+        self._record(s, "bad_tool", "failed")
+        self._record(s, "bad_tool", "failed")
         assert "bad_tool" in s.avoided_tools
         assert any("Do NOT use bad_tool" in h for h in s.steering_hints)
 
     def test_steering_prompt_format(self):
         s = create_harness_session()
-        self._record(s, "bad_tool", ExecutionStatus.FAILED)
-        self._record(s, "bad_tool", ExecutionStatus.FAILED)
+        self._record(s, "bad_tool", "failed")
+        self._record(s, "bad_tool", "failed")
         prompt = s.get_steering_prompt()
         assert "# Session Guidance" in prompt
         assert "Do NOT use bad_tool" in prompt
@@ -113,13 +116,13 @@ class TestToolStats:
 
     def test_budget_decrements(self):
         s = create_harness_session(budget=5)
-        self._record(s, "a", ExecutionStatus.COMPLETED)
-        self._record(s, "b", ExecutionStatus.COMPLETED)
+        self._record(s, "a", "completed")
+        self._record(s, "b", "completed")
         assert s.budget_remaining == 3
         assert not s.is_budget_exhausted
-        self._record(s, "c", ExecutionStatus.COMPLETED)
-        self._record(s, "d", ExecutionStatus.COMPLETED)
-        self._record(s, "e", ExecutionStatus.COMPLETED)
+        self._record(s, "c", "completed")
+        self._record(s, "d", "completed")
+        self._record(s, "e", "completed")
         assert s.is_budget_exhausted
 
 
@@ -332,7 +335,7 @@ class TestAuditTrail:
                 timestamp="2026-01-01T00:00:00Z",
                 tool_name="search",
                 arguments={"q": "test"},
-                status=ExecutionStatus.COMPLETED,
+                status="completed",
                 duration_ms=100.0,
             )
         )
@@ -350,15 +353,113 @@ class TestAuditTrail:
 
 
 # ---------------------------------------------------------------------------
-# Serialization
+# Serialization (pydantic v2)
 # ---------------------------------------------------------------------------
 
 
 class TestSerialization:
-    def test_to_dict(self):
+    def test_model_dump(self):
         s = create_harness_session(session_id="ser")
-        d = s.to_dict()
+        d = s.model_dump()
         assert d["session_id"] == "ser"
         assert "execution_history" in d
         assert "file_inputs" in d
         assert "warnings" in d
+
+    def test_model_dump_json(self):
+        s = create_harness_session(session_id="json-test")
+        json_str = s.model_dump_json()
+        data = json.loads(json_str)
+        assert data["session_id"] == "json-test"
+
+    def test_model_validate(self):
+        s = create_harness_session(session_id="validate-test")
+        d = s.model_dump()
+        s2 = HarnessState.model_validate(d)
+        assert s2.session_id == "validate-test"
+
+    def test_model_json_schema(self):
+        schema = HarnessState.model_json_schema()
+        assert "properties" in schema
+        assert "session_id" in schema["properties"]
+        assert "context_pressure" in schema["properties"]
+
+
+# ---------------------------------------------------------------------------
+# Pydantic validation
+# ---------------------------------------------------------------------------
+
+
+class TestPydanticValidation:
+    def test_execution_record_validation(self):
+        """Test that pydantic validation works on ExecutionRecord."""
+        record = ExecutionRecord(
+            timestamp="2026-01-01T00:00:00Z",
+            tool_name="search",
+            status="completed",
+            confidence=0.95,
+        )
+        assert record.confidence == 0.95
+
+    def test_execution_record_rejects_bad_confidence(self):
+        """Test that confidence > 1.0 is rejected."""
+        with pytest.raises(Exception):
+            ExecutionRecord(
+                timestamp="2026-01-01T00:00:00Z",
+                tool_name="search",
+                status="completed",
+                confidence=1.5,
+            )
+
+    def test_execution_record_rejects_negative_duration(self):
+        """Test that negative duration is rejected."""
+        with pytest.raises(Exception):
+            ExecutionRecord(
+                timestamp="2026-01-01T00:00:00Z",
+                tool_name="search",
+                status="completed",
+                duration_ms=-100.0,
+            )
+
+    def test_file_input_rejects_negative_size(self):
+        """Test that negative size is rejected."""
+        with pytest.raises(Exception):
+            FileInput(
+                path="/test",
+                filename="test.txt",
+                extension=".txt",
+                mime_type="text/plain",
+                size_bytes=-1,
+            )
+
+
+# ---------------------------------------------------------------------------
+# JSON Schema generation
+# ---------------------------------------------------------------------------
+
+
+class TestSchemaGeneration:
+    def test_tool_schema(self):
+        schema = tool_schema(
+            name="search_web",
+            description="Search the web",
+            parameters={
+                "query": {"type": "string", "description": "Search query"},
+                "max_results": {"type": "integer", "default": 5},
+            },
+        )
+        assert schema["type"] == "function"
+        assert schema["function"]["name"] == "search_web"
+        assert "query" in schema["function"]["parameters"]["properties"]
+        assert "query" in schema["function"]["parameters"]["required"]
+        assert "max_results" not in schema["function"]["parameters"]["required"]
+
+    def test_pydantic_tool_schema(self):
+        class SearchArgs(BaseModel):
+            query: str = Field(description="Search query")
+            max_results: int = Field(default=5, description="Max results")
+
+        schema = pydantic_tool_schema(SearchArgs, "search_web", "Search the web")
+        assert schema["type"] == "function"
+        assert schema["function"]["name"] == "search_web"
+        assert "query" in schema["function"]["parameters"]["properties"]

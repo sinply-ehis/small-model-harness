@@ -10,6 +10,9 @@ Key capabilities for tiny models:
 - Adaptive steering: inject "avoid this" hints after failures
 - Loop detection: break same-tool-same-args repetition
 - Response compaction: extract essentials from tool responses
+
+Built on pydantic v2 for validated models, JSON schema generation, and
+clean serialization.
 """
 
 from __future__ import annotations
@@ -20,11 +23,11 @@ import logging
 import mimetypes
 import re
 import time
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
 
 __version__ = "0.1.0"
 
@@ -57,27 +60,22 @@ _MAX_STEERING_HINTS = 5  # cap hints to avoid prompt bloat
 
 
 # ---------------------------------------------------------------------------
-# Enums and data classes
+# Pydantic models
 # ---------------------------------------------------------------------------
 
-
-class ExecutionStatus(Enum):
-    PLANNED = "planned"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    SKIPPED = "skipped"
+ExecutionStatus = Literal["planned", "running", "completed", "failed", "skipped"]
 
 
-@dataclass
-class FileInput:
+class FileInput(BaseModel):
     """Represents a file input to the assistant."""
+
+    model_config = ConfigDict(frozen=True)
 
     path: str
     filename: str
     extension: str
     mime_type: str
-    size_bytes: int
+    size_bytes: int = Field(ge=0)
     content: str = ""
     compacted: bool = False
     truncated: bool = False
@@ -96,23 +94,23 @@ class FileInput:
         return self.extension.lower() in {".pdf", ".epub"}
 
 
-@dataclass
-class ExecutionRecord:
+class ExecutionRecord(BaseModel):
     """Audit trail entry for a single tool execution."""
 
+    model_config = ConfigDict(frozen=True)
+
     timestamp: str
-    tool_name: str
-    arguments: dict
+    tool_name: str = Field(min_length=1)
+    arguments: dict[str, Any] = Field(default_factory=dict)
     status: ExecutionStatus
     result: str | None = None
     error: str | None = None
-    duration_ms: float = 0.0
-    confidence: float | None = None
-    retry_count: int = 0
+    duration_ms: float = Field(default=0.0, ge=0.0)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    retry_count: int = Field(default=0, ge=0)
 
 
-@dataclass
-class HarnessState:
+class HarnessState(BaseModel):
     """Complete harness state for a conversation session.
 
     Tracks session-level intelligence for small models: tool success/failure
@@ -120,25 +118,39 @@ class HarnessState:
     dynamic steering hints injected into the system prompt.
     """
 
+    model_config = ConfigDict(
+        validate_assignment=True,
+        json_schema_extra={
+            "examples": [
+                {
+                    "session_id": "abc123",
+                    "started_at": "2026-01-01T00:00:00Z",
+                    "budget_remaining": 8,
+                    "n_ctx": 4096,
+                }
+            ]
+        },
+    )
+
     session_id: str
     started_at: str
-    total_tool_calls: int = 0
-    successful_calls: int = 0
-    failed_calls: int = 0
-    total_duration_ms: float = 0.0
-    budget_remaining: int = 100
-    execution_history: list[ExecutionRecord] = field(default_factory=list)
-    file_inputs: list[FileInput] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
+    total_tool_calls: int = Field(default=0, ge=0)
+    successful_calls: int = Field(default=0, ge=0)
+    failed_calls: int = Field(default=0, ge=0)
+    total_duration_ms: float = Field(default=0.0, ge=0.0)
+    budget_remaining: int = Field(default=100, ge=0)
+    execution_history: list[ExecutionRecord] = Field(default_factory=list)
+    file_inputs: list[FileInput] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
     # --- Small-model session memory ---
-    tool_failure_counts: dict[str, int] = field(default_factory=dict)
-    tool_success_counts: dict[str, int] = field(default_factory=dict)
-    recent_tool_calls: list[str] = field(default_factory=list)
-    avoided_tools: set[str] = field(default_factory=set)
-    steering_hints: list[str] = field(default_factory=list)
-    context_pressure: float = 0.0
-    n_ctx: int = 0
+    tool_failure_counts: dict[str, int] = Field(default_factory=dict)
+    tool_success_counts: dict[str, int] = Field(default_factory=dict)
+    recent_tool_calls: list[str] = Field(default_factory=list)
+    avoided_tools: set[str] = Field(default_factory=set)
+    steering_hints: list[str] = Field(default_factory=list)
+    context_pressure: float = Field(default=0.0, ge=0.0, le=1.0)
+    n_ctx: int = Field(default=0, ge=0)
 
     def record_execution(self, record: ExecutionRecord) -> None:
         """Record a tool execution and update session intelligence."""
@@ -147,10 +159,10 @@ class HarnessState:
         self.total_duration_ms += record.duration_ms
         self.budget_remaining -= 1
 
-        if record.status == ExecutionStatus.COMPLETED:
+        if record.status == "completed":
             self.successful_calls += 1
             self.tool_success_counts[record.tool_name] = self.tool_success_counts.get(record.tool_name, 0) + 1
-        elif record.status == ExecutionStatus.FAILED:
+        elif record.status == "failed":
             self.failed_calls += 1
             self.tool_failure_counts[record.tool_name] = self.tool_failure_counts.get(record.tool_name, 0) + 1
 
@@ -228,47 +240,6 @@ class HarnessState:
     @property
     def is_context_warned(self) -> bool:
         return self.context_pressure >= _CONTEXT_PRESSURE_WARN
-
-    def to_dict(self) -> dict:
-        return {
-            "session_id": self.session_id,
-            "started_at": self.started_at,
-            "total_tool_calls": self.total_tool_calls,
-            "successful_calls": self.successful_calls,
-            "failed_calls": self.failed_calls,
-            "success_rate": round(self.success_rate, 3),
-            "total_duration_ms": self.total_duration_ms,
-            "budget_remaining": self.budget_remaining,
-            "context_pressure": round(self.context_pressure, 3),
-            "avoided_tools": sorted(self.avoided_tools),
-            "steering_hints": self.steering_hints,
-            "execution_history": [
-                {
-                    "timestamp": r.timestamp,
-                    "tool_name": r.tool_name,
-                    "arguments": r.arguments,
-                    "status": r.status.value,
-                    "result_preview": r.result[:200] if r.result else None,
-                    "error": r.error,
-                    "duration_ms": r.duration_ms,
-                    "confidence": r.confidence,
-                    "retry_count": r.retry_count,
-                }
-                for r in self.execution_history
-            ],
-            "file_inputs": [
-                {
-                    "filename": f.filename,
-                    "extension": f.extension,
-                    "size_bytes": f.size_bytes,
-                    "compacted": f.compacted,
-                    "truncated": f.truncated,
-                    "error": f.error,
-                }
-                for f in self.file_inputs
-            ],
-            "warnings": self.warnings,
-        }
 
 
 # ---------------------------------------------------------------------------
@@ -478,14 +449,14 @@ def validate_file_input(file_path: str | Path) -> FileInput:
     )
 
     if not file_input.is_supported:
-        file_input.error = f"Unsupported file type: {extension}. Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
-        logger.warning("Rejected file: %s (%s)", path.name, file_input.error)
-        return file_input
+        error_msg = f"Unsupported file type: {extension}. Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
+        logger.warning("Rejected file: %s (%s)", path.name, error_msg)
+        return file_input.model_copy(update={"error": error_msg})
 
     if stat.st_size > MAX_FILE_SIZE:
-        file_input.error = f"File too large: {stat.st_size} bytes (max {MAX_FILE_SIZE})"
-        logger.warning("Rejected file: %s (%s)", path.name, file_input.error)
-        return file_input
+        error_msg = f"File too large: {stat.st_size} bytes (max {MAX_FILE_SIZE})"
+        logger.warning("Rejected file: %s (%s)", path.name, error_msg)
+        return file_input.model_copy(update={"error": error_msg})
 
     return file_input
 
@@ -610,27 +581,29 @@ def process_file_input(file_path: str | Path, n_ctx: int | None = None) -> FileI
         elif file_input.extension.lower() == ".epub":
             content = transcribe_epub(path)
         else:
-            file_input.error = f"Unhandled file type: {file_input.extension}"
-            return file_input
+            return file_input.model_copy(update={"error": f"Unhandled file type: {file_input.extension}"})
 
         compacted_content, was_truncated = compact_text(content, n_ctx=n_ctx)
-        file_input.content = compacted_content
-        file_input.compacted = True
-        file_input.truncated = was_truncated
 
         logger.info(
             "Processed file: %s (%d chars, compacted=%s, truncated=%s)",
             path.name,
             len(content),
-            file_input.compacted,
-            file_input.truncated,
+            True,
+            was_truncated,
+        )
+
+        return file_input.model_copy(
+            update={
+                "content": compacted_content,
+                "compacted": True,
+                "truncated": was_truncated,
+            }
         )
 
     except Exception as e:
-        file_input.error = f"Failed to process file: {e}"
         logger.exception("File processing failed for %s", path)
-
-    return file_input
+        return file_input.model_copy(update={"error": f"Failed to process file: {e}"})
 
 
 def process_multiple_files(
@@ -710,7 +683,7 @@ def format_audit_trail(harness: HarnessState) -> str:
     if harness.execution_history:
         lines.append("Execution history:")
         for i, record in enumerate(harness.execution_history, 1):
-            status_marker = "ok" if record.status == ExecutionStatus.COMPLETED else "FAIL"
+            status_marker = "ok" if record.status == "completed" else "FAIL"
             conf = f" (conf={record.confidence:.2f})" if record.confidence else ""
             lines.append(f"  {i}. {status_marker} {record.tool_name} ({record.duration_ms:.0f}ms{conf})")
             if record.error:
@@ -746,3 +719,69 @@ def generate_session_summary(harness: HarnessState) -> str:
         f"budget: {harness.budget_remaining} remaining, "
         f"pressure: {harness.context_pressure:.0%}{avoid}"
     )
+
+
+# ---------------------------------------------------------------------------
+# JSON Schema generation (for small model tool definitions)
+# ---------------------------------------------------------------------------
+
+
+def tool_schema(
+    name: str,
+    description: str,
+    parameters: dict[str, Any],
+) -> dict[str, Any]:
+    """Generate an OpenAI-compatible tool schema from parameters.
+
+    Useful for generating tool definitions for small models that need
+    compact, well-structured schemas.
+
+    Example:
+        schema = tool_schema(
+            name="search_web",
+            description="Search the web for information",
+            parameters={
+                "query": {"type": "string", "description": "Search query"},
+                "max_results": {"type": "integer", "default": 5},
+            }
+        )
+    """
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": description,
+            "parameters": {
+                "type": "object",
+                "properties": parameters,
+                "required": [k for k, v in parameters.items() if "default" not in v],
+            },
+        },
+    }
+
+
+def pydantic_tool_schema(model: type[BaseModel], name: str, description: str) -> dict[str, Any]:
+    """Generate a tool schema from a pydantic BaseModel.
+
+    Uses the model's JSON schema to generate OpenAI-compatible tool definition.
+
+    Example:
+        class SearchArgs(BaseModel):
+            query: str = Field(description="Search query")
+            max_results: int = Field(default=5, description="Max results")
+
+        schema = pydantic_tool_schema(SearchArgs, "search_web", "Search the web")
+    """
+    schema = model.model_json_schema()
+    # Remove pydantic-specific keys
+    for key in ("title", "$schema", "definitions"):
+        schema.pop(key, None)
+
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": description,
+            "parameters": schema,
+        },
+    }

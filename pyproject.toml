@@ -9,6 +9,7 @@ description = "Session-level intelligence for small LLMs — failure tracking, a
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
+dependencies = ["pydantic>=2.0"]
 authors = [{ name = "sinply-ehis" }]
 keywords = ["llm", "harness", "small-model", "tool-calling", "agent"]
 classifiers = [
